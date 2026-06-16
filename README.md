@@ -183,4 +183,4 @@ The PowerShell script uploads the project, runs `scripts/deploy.sh` remotely, pr
 
 ## License
 
-MIT. See `LICENSE`.
+GPL-3.0. See `LICENSE`.

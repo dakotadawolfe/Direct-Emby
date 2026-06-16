@@ -16,7 +16,7 @@
     "emby",
     "addon"
   ],
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "dependencies": {
     "express": "^4.19.2"
   },
