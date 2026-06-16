@@ -1,73 +1,53 @@
 # DirectEmby
 
-DirectEmby is a private, self-hosted [Stremio](https://www.stremio.com/) addon for [Emby](https://emby.media/). It authenticates to Emby during setup, stores only an encrypted Emby access token inside the generated addon URL, and returns direct Emby static stream URLs to Stremio.
+DirectEmby is a private, self-hosted Stremio addon for Emby. It authenticates to Emby during setup, stores an encrypted Emby access token inside the generated addon URL, and gives Stremio direct Emby static stream URLs.
 
-DirectEmby does not proxy, relay, cache media, download media, transcode media, or convert media. Playback traffic goes directly from the Stremio device to the Emby server.
+DirectEmby does not proxy, relay, cache, transcode, download, or convert media. Playback traffic goes from the Stremio device directly to the Emby server.
 
 ## Features
 
-- Stremio manifest, catalog, meta, and stream handlers for movies and series.
-- Catalogs named `DirectEmby Movies` and `DirectEmby TV Shows`.
-- Catalog `search` and `skip` support.
-- Movie IDs mapped from `ProviderIds.Imdb`, for example `tt0111161`.
-- Series IDs mapped from `ProviderIds.Imdb`, for example `tt0944947`.
-- Episode IDs mapped as `ttSeriesId:season:episode`, for example `tt0944947:1:1`.
-- Fallback IDs for items without IMDb IDs: `directemby_movie_<id>` and `directemby_series_<id>:season:episode`.
+- Stremio manifest, catalog, meta, and stream handlers.
+- Movie and series catalogs named `DirectEmby Movies` and `DirectEmby TV Shows`.
+- Catalog search and pagination through Stremio `search` and `skip` extras.
+- Movie IDs from Emby IMDb provider IDs, with fallback IDs for media without IMDb data.
+- Series episode IDs in the format `ttSeriesId:season:episode`.
 - Browser setup page at `/configure`.
 - Health endpoint at `/health`.
 - Docker Compose deployment.
-- Optional Cloudflare Tunnel deployment.
-- No database. Only in-memory TTL caches are used.
+- Optional Cloudflare Tunnel service.
+- No database; only in-memory TTL caches are used.
 
 ## Security Model
 
 - Emby usernames and passwords are used only for the setup login request.
-- Passwords are never written to disk, stored in the addon config, returned in responses, or logged.
-- The generated install URL contains an encrypted and signed config payload.
+- Passwords are never written to disk, stored in addon config, returned in responses, or logged.
+- Generated install URLs contain an encrypted and signed config payload.
 - The encrypted config includes the Emby server URL, selected library IDs, Emby user ID, and Emby access token.
-- `ENCRYPTION_SECRET` must stay stable. Changing it invalidates previously generated install URLs.
-- Treat generated Stremio install URLs as private credentials.
-
-## Stream Behavior
-
-DirectEmby only returns direct static Emby stream URLs:
-
-```text
-/Videos/{ItemId}/stream?static=true&api_key=<TOKEN>
-```
-
-It does not use Emby HLS, transcoding, conversion, download, or proxy endpoints. If DirectEmby cannot determine that an item has a direct-playable media source, the stream handler returns:
-
-```json
-{ "streams": [] }
-```
+- `ENCRYPTION_SECRET` must stay stable. Changing it invalidates existing install URLs.
+- Treat generated Stremio install links as private credentials.
 
 ## Requirements
 
 For local development:
 
-- Node.js 20+
+- Node.js 20 or newer
 - npm
 
-For production deployment:
+For Docker deployment:
 
-- Linux host or VM
 - Docker
 - Docker Compose v2
-- curl
-- openssl
-
-The deploy script can install Docker, Docker Compose, Git, curl, and openssl on common `apt`, `dnf`, and `yum` systems when run by a sudo-capable user.
+- A public HTTPS URL, reverse proxy, or Cloudflare Tunnel if installing from outside the LAN
 
 ## Environment
 
-Copy the example file and edit the values:
+Copy the example file:
 
 ```bash
 cp .env.example .env
 ```
 
-Required:
+Required values:
 
 ```env
 PUBLIC_BASE_URL=https://your-addon.example.com
@@ -80,7 +60,7 @@ Generate a strong secret:
 openssl rand -base64 48
 ```
 
-Optional:
+Optional values:
 
 ```env
 PORT=3000
@@ -97,7 +77,7 @@ cp .env.example .env
 npm run dev
 ```
 
-Open:
+Open the setup page:
 
 ```text
 http://localhost:3000/configure
@@ -109,25 +89,24 @@ Run checks:
 npm run check
 ```
 
-Build:
+Build and run production JavaScript:
 
 ```bash
 npm run build
 npm start
 ```
 
-## Docker Compose
+## Docker
 
 ```bash
 cp .env.example .env
-# Edit .env.
 docker compose up -d --build
 curl http://127.0.0.1:3000/health
 ```
 
-By default, `docker-compose.yml` binds the app to `127.0.0.1:${PORT:-3000}` on the host. This is a good default when Cloudflare Tunnel or a reverse proxy is running on the same host.
+By default, `docker-compose.yml` binds the app to `127.0.0.1:${PORT:-3000}`. That is a safe default when a reverse proxy or Cloudflare Tunnel runs on the same host.
 
-For direct LAN/Internet exposure without a tunnel or reverse proxy, change the port mapping in `docker-compose.yml` from:
+For direct LAN exposure, change the port mapping from:
 
 ```yaml
 "127.0.0.1:${PORT:-3000}:3000"
@@ -141,32 +120,14 @@ to:
 
 ## Cloudflare Tunnel
 
-The simplest production option is a Cloudflare managed tunnel token.
-
-1. In Cloudflare Zero Trust, create a tunnel.
+1. Create a tunnel in Cloudflare Zero Trust.
 2. Add a public hostname such as `directemby.example.com`.
-3. Route that hostname to:
-
-```text
-http://directemby:3000
-```
-
-4. Put the tunnel token in `.env`:
-
-```env
-CLOUDFLARED_TOKEN=your-token
-```
-
-5. Start the Cloudflare profile:
+3. Route that hostname to `http://directemby:3000`.
+4. Set `CLOUDFLARED_TOKEN` in `.env`.
+5. Start the tunnel profile:
 
 ```bash
 docker compose --profile cloudflare up -d --build
-```
-
-If `cloudflared` is installed directly on the host instead of running in Docker, route the public hostname to:
-
-```text
-http://127.0.0.1:3000
 ```
 
 ## Deploy Over SSH
@@ -177,7 +138,7 @@ From Windows PowerShell:
 .\scripts\deploy.ps1 -HostName user@server -PublicBaseUrl https://directemby.example.com
 ```
 
-Optional parameters:
+Optional:
 
 ```powershell
 .\scripts\deploy.ps1 `
@@ -188,22 +149,7 @@ Optional parameters:
   -CloudflaredToken "YOUR_TUNNEL_TOKEN"
 ```
 
-The PowerShell script uploads the project as a tarball, extracts it on the remote host, and runs `scripts/deploy.sh`.
-
-You can also run the Linux deploy script directly from the project directory on the server:
-
-```bash
-APP_DIR="$PWD" PUBLIC_BASE_URL=https://directemby.example.com PORT=3000 bash scripts/deploy.sh
-```
-
-The deploy script:
-
-- Installs prerequisites if needed and sudo is available.
-- Creates `.env` with a generated `ENCRYPTION_SECRET` if `.env` does not already exist.
-- Preserves an existing `ENCRYPTION_SECRET`.
-- Starts Docker Compose with `restart: unless-stopped`.
-- Starts the Cloudflare Compose profile when `CLOUDFLARED_TOKEN` is present.
-- Verifies `http://127.0.0.1:${PORT}/health`.
+The PowerShell script uploads the project, runs `scripts/deploy.sh` remotely, preserves existing secrets, and verifies `/health`.
 
 ## Configure Stremio
 
@@ -213,13 +159,11 @@ The deploy script:
 4. Copy the generated Stremio install link.
 5. Open the `stremio://.../manifest.json` link on a device with Stremio installed.
 
-Generated addon URLs are already configured. Stremio should show an install option, not a configure loop.
-
 ## Routes
 
+- `GET /` redirects to `/configure`
 - `GET /health`
 - `GET /configure`
-- `GET /:config/configure`
 - `POST /configure/libraries`
 - `POST /configure/link`
 - `GET /:config/manifest.json`
@@ -228,37 +172,15 @@ Generated addon URLs are already configured. Stremio should show an install opti
 - `GET /:config/meta/:type/:id.json`
 - `GET /:config/stream/:type/:id.json`
 
-## Troubleshooting
+## Scripts
 
-### Stremio Says Failed To Fetch Manifest
-
-Verify the public manifest URL works in a browser or with curl:
-
-```bash
-curl -i https://directemby.example.com/health
-```
-
-Expected headers include:
-
-```text
-Access-Control-Allow-Origin: *
-Content-Type: application/json; charset=utf-8
-```
-
-If `/health` works but Stremio fails, confirm the addon URL includes `/manifest.json` and the public URL uses HTTPS.
-
-### Stremio Shows Configure Instead Of Install
-
-Generate a fresh install link from `/configure`. DirectEmby generated manifests are already configured and should not include `configurationRequired`.
-
-### Existing Install Links Stopped Working
-
-Check whether `ENCRYPTION_SECRET` changed. Existing links can only be decrypted with the same secret that generated them.
-
-### Streams Are Empty
-
-DirectEmby returns no streams when a media item does not expose a direct-playable media source. Check the Emby item in the Emby web UI and confirm the client can direct play it without transcoding.
+- `npm run dev` starts the TypeScript dev server with watch mode.
+- `npm run build` compiles TypeScript to `dist/`.
+- `npm start` runs the built app.
+- `npm test` runs Vitest.
+- `npm run typecheck` runs TypeScript without emitting files.
+- `npm run check` runs typecheck and tests.
 
 ## License
 
-MIT
+MIT. See `LICENSE`.
