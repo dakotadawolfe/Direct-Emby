@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+coverage/
+*.log
+npm-debug.log*
+directemby-deploy.tar.gz
+.DS_Store
+Thumbs.db
