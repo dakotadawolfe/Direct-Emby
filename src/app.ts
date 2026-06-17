@@ -170,6 +170,7 @@ export function createApp(options: CreateAppOptions) {
         userId: session.userId,
         movieLibraryIds,
         seriesLibraryIds,
+        preferSdr: req.body.preferSdr === true,
         createdAt: Date.now()
       };
       const encrypted = encryptConfig(addonConfig, options.config.encryptionSecret);

@@ -12,7 +12,7 @@ import {
   StremioStream,
   StremioVideo
 } from "./types";
-import { buildImageUrl, buildStaticStreamUrl, canDirectPlay, EmbyClient } from "./emby";
+import { buildImageUrl, buildSdrTranscodeUrl, buildStaticStreamUrlForSource, EmbyClient, selectPlaybackSource } from "./emby";
 import { episodeStremioId, movieStremioId, parseEpisodeId, seriesStremioId } from "./id";
 
 export function buildManifest() {
@@ -144,12 +144,14 @@ export async function buildStreamResponse(
 ): Promise<{ streams: StremioStream[] }> {
   if (type === "movie") {
     const movie = await emby.findMovie(config, id);
-    if (!movie || !canDirectPlay(movie)) {
+    if (!movie) {
       return { streams: [] };
     }
 
+    const stream = toStream(config, movie);
+
     return {
-      streams: [toStream(config, movie)]
+      streams: stream ? [stream] : []
     };
   }
 
@@ -171,12 +173,13 @@ export async function buildStreamResponse(
       candidate.IndexNumber === parsed.episode
   );
 
-  if (!episode || !canDirectPlay(episode)) {
+  if (!episode) {
     return { streams: [] };
   }
 
+  const stream = toStream(config, episode);
   return {
-    streams: [toStream(config, episode)]
+    streams: stream ? [stream] : []
   };
 }
 
@@ -211,16 +214,27 @@ function toEpisodeVideo(config: AddonConfig, series: EmbyItem, episode: EmbyItem
   };
 }
 
-function toStream(config: AddonConfig, item: EmbyItem): StremioStream {
-  const mediaSource = item.MediaSources?.[0];
+function toStream(config: AddonConfig, item: EmbyItem): StremioStream | undefined {
+  const playback = selectPlaybackSource(item, config.preferSdr === true);
+  if (!playback) {
+    return undefined;
+  }
+
+  const mediaSource = playback.mediaSource;
   const quality = mediaSource?.Bitrate ? `${Math.round(mediaSource.Bitrate / 1_000_000)} Mbps` : undefined;
   const container = mediaSource?.Container?.toUpperCase();
-  const details = [container, quality].filter(Boolean).join(" - ");
+  const mode = playback.mode === "sdr-transcode" ? "SDR transcode" : undefined;
+  const details = [mode, container, quality].filter(Boolean).join(" - ");
+  const mediaSourceId = config.preferSdr === true ? mediaSource.Id : undefined;
+  const url =
+    playback.mode === "sdr-transcode"
+      ? buildSdrTranscodeUrl(config, item.Id, mediaSourceId)
+      : buildStaticStreamUrlForSource(config, item.Id, mediaSourceId);
 
   return {
     name: APP_NAME,
     title: details ? `${APP_NAME}\n${details}` : APP_NAME,
-    url: buildStaticStreamUrl(config, item.Id),
+    url,
     behaviorHints: {
       notWebReady: false
     }

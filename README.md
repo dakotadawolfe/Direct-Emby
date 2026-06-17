@@ -1,8 +1,8 @@
 # DirectEmby
 
-DirectEmby is a private, self-hosted Stremio addon for Emby. It authenticates to Emby during setup, stores an encrypted Emby access token inside the generated addon URL, and gives Stremio direct Emby static stream URLs.
+DirectEmby is a private, self-hosted Stremio addon for Emby. It authenticates to Emby during setup, stores an encrypted Emby access token inside the generated addon URL, and gives Stremio Emby playback URLs.
 
-DirectEmby does not proxy, relay, cache, transcode, download, or convert media. Playback traffic goes from the Stremio device directly to the Emby server.
+By default, DirectEmby does not proxy, relay, cache, transcode, download, or convert media. Playback traffic goes from the Stremio device directly to the Emby server. If `Prefer SDR playback` is selected during setup, HDR streams use Emby's HLS transcoding endpoint so Emby can output SDR-friendly H.264 video.
 
 ## Features
 
@@ -12,6 +12,7 @@ DirectEmby does not proxy, relay, cache, transcode, download, or convert media. 
 - Movie IDs from Emby IMDb provider IDs, with fallback IDs for media without IMDb data.
 - Series episode IDs in the format `ttSeriesId:season:episode`.
 - Browser setup page at `/configure`.
+- Optional SDR playback mode for TVs where HDR looks too dark.
 - Health endpoint at `/health`.
 - Docker Compose deployment.
 - Optional Cloudflare Tunnel service.
@@ -156,8 +157,9 @@ The PowerShell script uploads the project, runs `scripts/deploy.sh` remotely, pr
 1. Open `https://directemby.example.com/configure`.
 2. Enter your Emby server URL, username, and password.
 3. Select movie and TV libraries.
-4. Copy the generated Stremio install link.
-5. Open the `stremio://.../manifest.json` link on a device with Stremio installed.
+4. Optionally select `Prefer SDR playback` to avoid HDR output through Emby HLS transcoding.
+5. Copy the generated Stremio install link.
+6. Open the `stremio://.../manifest.json` link on a device with Stremio installed.
 
 ## Routes
 

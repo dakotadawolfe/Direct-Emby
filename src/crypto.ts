@@ -40,6 +40,7 @@ function assertConfigShape(value: unknown): asserts value is AddonConfig {
     typeof config.userId !== "string" ||
     !Array.isArray(config.movieLibraryIds) ||
     !Array.isArray(config.seriesLibraryIds) ||
+    (config.preferSdr !== undefined && typeof config.preferSdr !== "boolean") ||
     typeof config.createdAt !== "number"
   ) {
     throw new Error("Invalid addon config payload");

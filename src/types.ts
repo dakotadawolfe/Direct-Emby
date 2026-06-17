@@ -20,6 +20,7 @@ export interface AddonConfig {
   userId: string;
   movieLibraryIds: string[];
   seriesLibraryIds: string[];
+  preferSdr?: boolean;
   createdAt: number;
 }
 
@@ -52,6 +53,22 @@ export interface EmbyMediaSource {
   SupportsDirectStream?: boolean;
   TranscodingUrl?: string;
   IsRemote?: boolean;
+  VideoRange?: string;
+  VideoRangeType?: string;
+  MediaStreams?: EmbyMediaStream[];
+}
+
+export interface EmbyMediaStream {
+  Type?: string;
+  Codec?: string;
+  DisplayTitle?: string;
+  Title?: string;
+  VideoRange?: string;
+  VideoRangeType?: string;
+  ColorTransfer?: string;
+  ColorPrimaries?: string;
+  ColorSpace?: string;
+  BitDepth?: number;
 }
 
 export interface EmbyItem {

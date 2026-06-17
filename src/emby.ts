@@ -9,6 +9,7 @@ import {
   EmbyItem,
   EmbyItemsResponse,
   EmbyLibrary,
+  EmbyMediaSource,
   FetchLike
 } from "./types";
 
@@ -106,6 +107,27 @@ export function buildStaticStreamUrl(config: AddonConfig, itemId: string): strin
   });
 }
 
+export function buildStaticStreamUrlForSource(config: AddonConfig, itemId: string, mediaSourceId?: string): string {
+  return buildEmbyUrl(config.embyUrl, `/Videos/${encodeURIComponent(itemId)}/stream`, {
+    static: "true",
+    MediaSourceId: mediaSourceId,
+    api_key: config.accessToken
+  });
+}
+
+export function buildSdrTranscodeUrl(config: AddonConfig, itemId: string, mediaSourceId?: string): string {
+  return buildEmbyUrl(config.embyUrl, `/Videos/${encodeURIComponent(itemId)}/master.m3u8`, {
+    Container: "ts",
+    DeviceId: `DirectEmby-${config.createdAt}`,
+    MediaSourceId: mediaSourceId,
+    VideoCodec: "h264",
+    MaxVideoBitDepth: 8,
+    EnableAutoStreamCopy: false,
+    Static: false,
+    api_key: config.accessToken
+  });
+}
+
 export function buildImageUrl(config: AddonConfig, itemId: string, imageType: "Primary" | "Backdrop" = "Primary"): string {
   return buildEmbyUrl(config.embyUrl, `/Items/${encodeURIComponent(itemId)}/Images/${imageType}`, {
     api_key: config.accessToken
@@ -113,23 +135,104 @@ export function buildImageUrl(config: AddonConfig, itemId: string, imageType: "P
 }
 
 export function canDirectPlay(item: EmbyItem): boolean {
+  return Boolean(selectDirectPlayableSource(item));
+}
+
+export interface PlaybackSource {
+  mediaSource: EmbyMediaSource;
+  mode: "direct" | "sdr-transcode";
+}
+
+export function selectPlaybackSource(item: EmbyItem, preferSdr = false): PlaybackSource | undefined {
   if (item.IsFolder || item.LocationType === "Virtual") {
-    return false;
+    return undefined;
   }
 
   const sources = item.MediaSources ?? [];
   if (sources.length === 0) {
-    return false;
+    return undefined;
   }
 
-  return sources.some((source) => {
-    const protocol = source.Protocol?.toLowerCase();
-    const supportedDirectPlay = source.SupportsDirectPlay !== false;
-    const supportedDirectStream = source.SupportsDirectStream !== false;
-    const hasTranscodingUrl = Boolean(source.TranscodingUrl);
-    const unsupportedProtocol = protocol === "rtmp";
-    return supportedDirectPlay && supportedDirectStream && !hasTranscodingUrl && !unsupportedProtocol;
+  if (preferSdr) {
+    const sdrSource = sources.find((source) => isDirectPlayableSource(source) && !isHdrMediaSource(source));
+    if (sdrSource) {
+      return {
+        mediaSource: sdrSource,
+        mode: "direct"
+      };
+    }
+
+    const transcodeSource = sources.find((source) => !isUnsupportedProtocol(source));
+    if (transcodeSource) {
+      return {
+        mediaSource: transcodeSource,
+        mode: "sdr-transcode"
+      };
+    }
+  }
+
+  const directSource = selectDirectPlayableSource(item);
+  return directSource
+    ? {
+        mediaSource: directSource,
+        mode: "direct"
+      }
+    : undefined;
+}
+
+export function isHdrMediaSource(source: EmbyMediaSource): boolean {
+  const values = [
+    source.Name,
+    source.VideoRange,
+    source.VideoRangeType,
+    ...((source.MediaStreams ?? []).flatMap((stream) => [
+      stream.Type?.toLowerCase() === "video" ? stream.Codec : undefined,
+      stream.Type?.toLowerCase() === "video" ? stream.DisplayTitle : undefined,
+      stream.Type?.toLowerCase() === "video" ? stream.Title : undefined,
+      stream.Type?.toLowerCase() === "video" ? stream.VideoRange : undefined,
+      stream.Type?.toLowerCase() === "video" ? stream.VideoRangeType : undefined,
+      stream.Type?.toLowerCase() === "video" ? stream.ColorTransfer : undefined,
+      stream.Type?.toLowerCase() === "video" ? stream.ColorPrimaries : undefined,
+      stream.Type?.toLowerCase() === "video" ? stream.ColorSpace : undefined
+    ]) ?? [])
+  ];
+
+  return values.some((value) => {
+    const normalized = value?.toLowerCase();
+    if (!normalized) {
+      return false;
+    }
+
+    return (
+      normalized.includes("hdr") ||
+      normalized.includes("dolby vision") ||
+      normalized.includes("dovi") ||
+      normalized.includes("dvhe") ||
+      normalized.includes("hlg") ||
+      normalized.includes("smpte2084") ||
+      normalized.includes("arib-std-b67") ||
+      normalized.includes("bt2020")
+    );
   });
+}
+
+function selectDirectPlayableSource(item: EmbyItem): EmbyMediaSource | undefined {
+  if (item.IsFolder || item.LocationType === "Virtual") {
+    return undefined;
+  }
+
+  return item.MediaSources?.find(isDirectPlayableSource);
+}
+
+function isDirectPlayableSource(source: EmbyMediaSource): boolean {
+  const supportedDirectPlay = source.SupportsDirectPlay !== false;
+  const supportedDirectStream = source.SupportsDirectStream !== false;
+  const hasTranscodingUrl = Boolean(source.TranscodingUrl);
+  return supportedDirectPlay && supportedDirectStream && !hasTranscodingUrl && !isUnsupportedProtocol(source);
+}
+
+function isUnsupportedProtocol(source: EmbyMediaSource): boolean {
+  return source.Protocol?.toLowerCase() === "rtmp";
 }
 
 export class EmbyClient {

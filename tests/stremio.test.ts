@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildStaticStreamUrl, canDirectPlay } from "../src/emby";
+import {
+  buildSdrTranscodeUrl,
+  buildStaticStreamUrl,
+  canDirectPlay,
+  isHdrMediaSource,
+  selectPlaybackSource
+} from "../src/emby";
 import { episodeStremioId, movieStremioId, seriesStremioId } from "../src/id";
 import { AddonConfig, EmbyItem } from "../src/types";
 
@@ -39,10 +45,52 @@ describe("direct stream handling", () => {
     expect(url).not.toContain("transcode");
   });
 
+  it("builds an SDR HLS transcode URL", () => {
+    const url = buildSdrTranscodeUrl(config, "item-1", "source-1");
+    expect(url).toBe(
+      "https://emby.example.com/Videos/item-1/master.m3u8?Container=ts&DeviceId=DirectEmby-1&MediaSourceId=source-1&VideoCodec=h264&MaxVideoBitDepth=8&EnableAutoStreamCopy=false&Static=false&api_key=token-123"
+    );
+  });
+
   it("requires a direct playable media source", () => {
     expect(canDirectPlay({ Id: "item", MediaSources: [{ SupportsDirectPlay: true, SupportsDirectStream: true }] })).toBe(true);
     expect(canDirectPlay({ Id: "item", MediaSources: [{ SupportsDirectPlay: false }] })).toBe(false);
     expect(canDirectPlay({ Id: "item", MediaSources: [{ TranscodingUrl: "/Videos/x/master.m3u8" }] })).toBe(false);
     expect(canDirectPlay({ Id: "item" })).toBe(false);
+  });
+
+  it("detects HDR media source metadata", () => {
+    expect(isHdrMediaSource({ MediaStreams: [{ Type: "Video", VideoRange: "HDR10" }] })).toBe(true);
+    expect(isHdrMediaSource({ MediaStreams: [{ Type: "Video", ColorTransfer: "smpte2084" }] })).toBe(true);
+    expect(isHdrMediaSource({ MediaStreams: [{ Type: "Video", VideoRange: "SDR" }] })).toBe(false);
+  });
+
+  it("prefers an SDR source before transcoding HDR", () => {
+    const item: EmbyItem = {
+      Id: "item",
+      MediaSources: [
+        {
+          Id: "hdr",
+          SupportsDirectPlay: true,
+          SupportsDirectStream: true,
+          MediaStreams: [{ Type: "Video", VideoRange: "HDR10" }]
+        },
+        {
+          Id: "sdr",
+          SupportsDirectPlay: true,
+          SupportsDirectStream: true,
+          MediaStreams: [{ Type: "Video", VideoRange: "SDR" }]
+        }
+      ]
+    };
+
+    expect(selectPlaybackSource(item, true)).toMatchObject({
+      mediaSource: { Id: "sdr" },
+      mode: "direct"
+    });
+    expect(selectPlaybackSource({ ...item, MediaSources: [item.MediaSources![0]] }, true)).toMatchObject({
+      mediaSource: { Id: "hdr" },
+      mode: "sdr-transcode"
+    });
   });
 });

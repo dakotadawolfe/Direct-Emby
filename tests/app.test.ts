@@ -14,7 +14,7 @@ const runtimeConfig: RuntimeConfig = {
   setupSessionTtlMs: 60_000
 };
 
-function addonConfig(): AddonConfig {
+function addonConfig(overrides: Partial<AddonConfig> = {}): AddonConfig {
   return {
     v: 1,
     embyUrl: "https://emby.example.com",
@@ -22,7 +22,8 @@ function addonConfig(): AddonConfig {
     userId: "user-1",
     movieLibraryIds: ["movies"],
     seriesLibraryIds: ["series"],
-    createdAt: 1
+    createdAt: 1,
+    ...overrides
   };
 }
 
@@ -157,6 +158,39 @@ describe("DirectEmby app", () => {
     );
     expect(stream.body.streams[0].url).not.toContain("m3u8");
     expect(calls.some((url) => url.includes("AnyProviderIdEquals=imdb.tt0111161"))).toBe(true);
+  });
+
+  it("serves SDR HLS streams when the install link prefers SDR", async () => {
+    const fetchImpl = async (): Promise<Response> =>
+      jsonResponse({
+        Items: [
+          {
+            Id: "movie-1",
+            Type: "Movie",
+            Name: "HDR Movie",
+            ProviderIds: { Imdb: "tt0000002" },
+            MediaSources: [
+              {
+                Id: "source-1",
+                SupportsDirectPlay: true,
+                SupportsDirectStream: true,
+                Container: "mkv",
+                MediaStreams: [{ Type: "Video", VideoRange: "HDR10" }]
+              }
+            ]
+          }
+        ]
+      });
+
+    const encrypted = encryptConfig(addonConfig({ preferSdr: true }), secret);
+    const app = createApp({ config: runtimeConfig, fetchImpl: fetchImpl as typeof fetch });
+
+    const stream = await request(app).get(`/${encrypted}/stream/movie/tt0000002.json`).expect(200);
+    expect(stream.body.streams).toHaveLength(1);
+    expect(stream.body.streams[0].title).toContain("SDR transcode");
+    expect(stream.body.streams[0].url).toBe(
+      "https://emby.example.com/Videos/movie-1/master.m3u8?Container=ts&DeviceId=DirectEmby-1&MediaSourceId=source-1&VideoCodec=h264&MaxVideoBitDepth=8&EnableAutoStreamCopy=false&Static=false&api_key=token-123"
+    );
   });
 
   it("returns an empty stream list when direct play is unavailable", async () => {

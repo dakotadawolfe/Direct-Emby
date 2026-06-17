@@ -241,6 +241,10 @@ export function configurePage(): string {
               <div id="series-libraries" class="checks"></div>
             </div>
           </div>
+          <label class="check">
+            <input id="prefer-sdr" name="preferSdr" type="checkbox">
+            <span>Prefer SDR playback</span>
+          </label>
           <button id="link-button" type="submit">Generate Install Link</button>
           <div id="link-status" class="status" role="status"></div>
         </form>
@@ -366,9 +370,10 @@ export function configurePage(): string {
 
       const movieLibraryIds = [...libraryForm.querySelectorAll("input[name='movieLibraries']:checked")].map((input) => input.value);
       const seriesLibraryIds = [...libraryForm.querySelectorAll("input[name='seriesLibraries']:checked")].map((input) => input.value);
+      const preferSdr = document.getElementById("prefer-sdr").checked;
 
       try {
-        const data = await postJson("/configure/link", { setupId, movieLibraryIds, seriesLibraryIds });
+        const data = await postJson("/configure/link", { setupId, movieLibraryIds, seriesLibraryIds, preferSdr });
         stremioLink.value = data.installUrl;
         manifestUrl.value = data.manifestUrl;
         links.classList.remove("hidden");
