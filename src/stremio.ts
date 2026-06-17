@@ -12,7 +12,7 @@ import {
   StremioStream,
   StremioVideo
 } from "./types";
-import { buildImageUrl, buildSdrTranscodeUrl, buildStaticStreamUrlForSource, EmbyClient, selectPlaybackSource } from "./emby";
+import { buildImageUrl, buildStaticStreamUrlForSource, EmbyClient, selectPlaybackSource } from "./emby";
 import { episodeStremioId, movieStremioId, parseEpisodeId, seriesStremioId } from "./id";
 
 export function buildManifest() {
@@ -223,18 +223,13 @@ function toStream(config: AddonConfig, item: EmbyItem): StremioStream | undefine
   const mediaSource = playback.mediaSource;
   const quality = mediaSource?.Bitrate ? `${Math.round(mediaSource.Bitrate / 1_000_000)} Mbps` : undefined;
   const container = mediaSource?.Container?.toUpperCase();
-  const mode = playback.mode === "sdr-transcode" ? "SDR transcode" : undefined;
-  const details = [mode, container, quality].filter(Boolean).join(" - ");
+  const details = [container, quality].filter(Boolean).join(" - ");
   const mediaSourceId = config.preferSdr === true ? mediaSource.Id : undefined;
-  const url =
-    playback.mode === "sdr-transcode"
-      ? buildSdrTranscodeUrl(config, item.Id, mediaSourceId)
-      : buildStaticStreamUrlForSource(config, item.Id, mediaSourceId);
 
   return {
     name: APP_NAME,
     title: details ? `${APP_NAME}\n${details}` : APP_NAME,
-    url,
+    url: buildStaticStreamUrlForSource(config, item.Id, mediaSourceId),
     behaviorHints: {
       notWebReady: false
     }

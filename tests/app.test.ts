@@ -160,7 +160,7 @@ describe("DirectEmby app", () => {
     expect(calls.some((url) => url.includes("AnyProviderIdEquals=imdb.tt0111161"))).toBe(true);
   });
 
-  it("serves SDR HLS streams when the install link prefers SDR", async () => {
+  it("keeps direct HDR streams when no SDR source is available", async () => {
     const fetchImpl = async (): Promise<Response> =>
       jsonResponse({
         Items: [
@@ -187,10 +187,10 @@ describe("DirectEmby app", () => {
 
     const stream = await request(app).get(`/${encrypted}/stream/movie/tt0000002.json`).expect(200);
     expect(stream.body.streams).toHaveLength(1);
-    expect(stream.body.streams[0].title).toContain("SDR transcode");
     expect(stream.body.streams[0].url).toBe(
-      "https://emby.example.com/Videos/movie-1/master.m3u8?Container=ts&DeviceId=DirectEmby-1&MediaSourceId=source-1&VideoCodec=h264&MaxVideoBitDepth=8&EnableAutoStreamCopy=false&Static=false&api_key=token-123"
+      "https://emby.example.com/Videos/movie-1/stream?static=true&MediaSourceId=source-1&api_key=token-123"
     );
+    expect(stream.body.streams[0].url).not.toContain("master.m3u8");
   });
 
   it("returns an empty stream list when direct play is unavailable", async () => {

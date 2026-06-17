@@ -243,7 +243,7 @@ export function configurePage(): string {
           </div>
           <label class="check">
             <input id="prefer-sdr" name="preferSdr" type="checkbox">
-            <span>Prefer SDR playback</span>
+            <span>Prefer SDR when available</span>
           </label>
           <button id="link-button" type="submit">Generate Install Link</button>
           <div id="link-status" class="status" role="status"></div>

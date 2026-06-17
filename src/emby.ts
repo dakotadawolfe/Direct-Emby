@@ -115,19 +115,6 @@ export function buildStaticStreamUrlForSource(config: AddonConfig, itemId: strin
   });
 }
 
-export function buildSdrTranscodeUrl(config: AddonConfig, itemId: string, mediaSourceId?: string): string {
-  return buildEmbyUrl(config.embyUrl, `/Videos/${encodeURIComponent(itemId)}/master.m3u8`, {
-    Container: "ts",
-    DeviceId: `DirectEmby-${config.createdAt}`,
-    MediaSourceId: mediaSourceId,
-    VideoCodec: "h264",
-    MaxVideoBitDepth: 8,
-    EnableAutoStreamCopy: false,
-    Static: false,
-    api_key: config.accessToken
-  });
-}
-
 export function buildImageUrl(config: AddonConfig, itemId: string, imageType: "Primary" | "Backdrop" = "Primary"): string {
   return buildEmbyUrl(config.embyUrl, `/Items/${encodeURIComponent(itemId)}/Images/${imageType}`, {
     api_key: config.accessToken
@@ -140,7 +127,6 @@ export function canDirectPlay(item: EmbyItem): boolean {
 
 export interface PlaybackSource {
   mediaSource: EmbyMediaSource;
-  mode: "direct" | "sdr-transcode";
 }
 
 export function selectPlaybackSource(item: EmbyItem, preferSdr = false): PlaybackSource | undefined {
@@ -157,16 +143,7 @@ export function selectPlaybackSource(item: EmbyItem, preferSdr = false): Playbac
     const sdrSource = sources.find((source) => isDirectPlayableSource(source) && !isHdrMediaSource(source));
     if (sdrSource) {
       return {
-        mediaSource: sdrSource,
-        mode: "direct"
-      };
-    }
-
-    const transcodeSource = sources.find((source) => !isUnsupportedProtocol(source));
-    if (transcodeSource) {
-      return {
-        mediaSource: transcodeSource,
-        mode: "sdr-transcode"
+        mediaSource: sdrSource
       };
     }
   }
@@ -174,8 +151,7 @@ export function selectPlaybackSource(item: EmbyItem, preferSdr = false): Playbac
   const directSource = selectDirectPlayableSource(item);
   return directSource
     ? {
-        mediaSource: directSource,
-        mode: "direct"
+        mediaSource: directSource
       }
     : undefined;
 }

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildSdrTranscodeUrl,
   buildStaticStreamUrl,
   canDirectPlay,
   isHdrMediaSource,
@@ -45,13 +44,6 @@ describe("direct stream handling", () => {
     expect(url).not.toContain("transcode");
   });
 
-  it("builds an SDR HLS transcode URL", () => {
-    const url = buildSdrTranscodeUrl(config, "item-1", "source-1");
-    expect(url).toBe(
-      "https://emby.example.com/Videos/item-1/master.m3u8?Container=ts&DeviceId=DirectEmby-1&MediaSourceId=source-1&VideoCodec=h264&MaxVideoBitDepth=8&EnableAutoStreamCopy=false&Static=false&api_key=token-123"
-    );
-  });
-
   it("requires a direct playable media source", () => {
     expect(canDirectPlay({ Id: "item", MediaSources: [{ SupportsDirectPlay: true, SupportsDirectStream: true }] })).toBe(true);
     expect(canDirectPlay({ Id: "item", MediaSources: [{ SupportsDirectPlay: false }] })).toBe(false);
@@ -65,7 +57,7 @@ describe("direct stream handling", () => {
     expect(isHdrMediaSource({ MediaStreams: [{ Type: "Video", VideoRange: "SDR" }] })).toBe(false);
   });
 
-  it("prefers an SDR source before transcoding HDR", () => {
+  it("prefers an SDR source before falling back to HDR direct play", () => {
     const item: EmbyItem = {
       Id: "item",
       MediaSources: [
@@ -85,12 +77,10 @@ describe("direct stream handling", () => {
     };
 
     expect(selectPlaybackSource(item, true)).toMatchObject({
-      mediaSource: { Id: "sdr" },
-      mode: "direct"
+      mediaSource: { Id: "sdr" }
     });
     expect(selectPlaybackSource({ ...item, MediaSources: [item.MediaSources![0]] }, true)).toMatchObject({
-      mediaSource: { Id: "hdr" },
-      mode: "sdr-transcode"
+      mediaSource: { Id: "hdr" }
     });
   });
 });
